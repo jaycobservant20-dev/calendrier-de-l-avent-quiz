@@ -1,0 +1,714 @@
+
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Calendrier de l'Avent - Quiz de Noël</title>
+    <!-- Chargement de Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Chargement de Google Fonts : Fredoka et Inter -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    
+    <style>
+        /* Verrouillage sur 100dvh sans débordement global */
+        html, body {
+            height: 100vh;
+            height: 100dvh;
+            max-height: 100dvh;
+            overflow: hidden;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: radial-gradient(circle at top, #1e3a2f 0%, #0f241d 60%, #091712 100%);
+            color: #ffffff;
+            display: flex;
+            flex-direction: column;
+        }
+
+        h1, h2, h3, .font-festive {
+            font-family: 'Fredoka', sans-serif;
+        }
+
+        /* Canvas arrière-plan neige et premier plan confettis (jamais bloquants pour les clics) */
+        #snow-canvas {
+            position: fixed;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 1;
+        }
+
+        #confetti-canvas {
+            position: fixed;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 50;
+        }
+
+        /* Animations festives */
+        @keyframes floatSlow {
+            0%, 100% { transform: translateY(0px) rotate(0deg); }
+            50% { transform: translateY(-5px) rotate(3deg); }
+        }
+
+        @keyframes danceJump {
+            0%, 100% { transform: translateY(0) scale(1) rotate(0deg); }
+            25% { transform: translateY(-8px) scale(1.1) rotate(-8deg); }
+            50% { transform: translateY(0) scale(0.96) rotate(0deg); }
+            75% { transform: translateY(-7px) scale(1.1) rotate(8deg); }
+        }
+
+        @keyframes shakeGentle {
+            0%, 100% { transform: translateX(0); }
+            20% { transform: translateX(-5px); }
+            40% { transform: translateX(5px); }
+            60% { transform: translateX(-4px); }
+            80% { transform: translateX(4px); }
+        }
+
+        @keyframes popIn {
+            0% { opacity: 0; transform: scale(0.95) translateY(6px); }
+            100% { opacity: 1; transform: scale(1) translateY(0); }
+        }
+
+        .animate-float {
+            animation: floatSlow 3.5s ease-in-out infinite;
+        }
+
+        .animate-dance {
+            display: inline-block;
+            animation: danceJump 0.9s ease-in-out infinite;
+        }
+
+        .animate-dance-delay-1 {
+            display: inline-block;
+            animation: danceJump 0.9s ease-in-out 0.15s infinite;
+        }
+
+        .animate-dance-delay-2 {
+            display: inline-block;
+            animation: danceJump 0.9s ease-in-out 0.3s infinite;
+        }
+
+        .animate-shake {
+            animation: shakeGentle 0.4s ease-in-out;
+        }
+
+        .animate-pop {
+            animation: popIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+        }
+
+        /* Carte centrale fluide et compacte avec scroll interne discret si écran minuscule */
+        .card {
+            background: rgba(255, 255, 255, 0.98);
+            color: #1f2937;
+            box-shadow: 0 16px 40px rgba(0, 0, 0, 0.45), 0 0 0 3px rgba(234, 179, 8, 0.45);
+            overflow-y: auto;
+            scrollbar-width: thin;
+            scrollbar-color: rgba(185, 28, 28, 0.3) transparent;
+        }
+
+        .card::-webkit-scrollbar {
+            width: 5px;
+        }
+
+        .card::-webkit-scrollbar-thumb {
+            background-color: rgba(185, 28, 28, 0.3);
+            border-radius: 9999px;
+        }
+
+        /* Guirlande lumineuse compacte en haut */
+        .light-bulb {
+            width: 10px;
+            height: 14px;
+            border-radius: 50% 50% 50% 50% / 30% 30% 70% 70%;
+            animation: glowPulse 1.5s infinite alternate;
+        }
+
+        @keyframes glowPulse {
+            from { opacity: 0.65; transform: scale(0.95); }
+            to { opacity: 1; transform: scale(1.08); }
+        }
+
+        /* Typographie et espacements fluides avec clamp() */
+        .title-clamp {
+            font-size: clamp(1.65rem, 4.5vw, 3rem);
+            line-height: 1.1;
+        }
+
+        .question-clamp {
+            font-size: clamp(1rem, 2.5vw, 1.4rem);
+            line-height: 1.25;
+        }
+
+        .option-clamp {
+            font-size: clamp(0.875rem, 2.1vw, 1rem);
+        }
+    </style>
+</head>
+<body class="h-dvh max-h-dvh overflow-hidden flex flex-col justify-between relative select-none">
+
+    <!-- Canvas pour les flocons de neige -->
+    <canvas id="snow-canvas"></canvas>
+
+    <!-- Canvas pour les confettis (z-index: 50, pointer-events: none) -->
+    <canvas id="confetti-canvas"></canvas>
+
+    <!-- Guirlande décorative supérieure -->
+    <header class="relative z-10 w-full shrink-0 pt-2 pb-1 px-3 flex justify-center items-center gap-4 sm:gap-7 overflow-hidden" aria-hidden="true">
+        <div class="light-bulb bg-red-500 shadow-[0_0_10px_#ef4444]"></div>
+        <div class="light-bulb bg-yellow-400 shadow-[0_0_10px_#facc15]" style="animation-delay: 0.3s;"></div>
+        <div class="light-bulb bg-emerald-400 shadow-[0_0_10px_#34d399]" style="animation-delay: 0.6s;"></div>
+        <div class="light-bulb bg-sky-400 shadow-[0_0_10px_#38bdf8]" style="animation-delay: 0.9s;"></div>
+        <div class="light-bulb bg-red-500 shadow-[0_0_10px_#ef4444]" style="animation-delay: 1.2s;"></div>
+        <div class="light-bulb bg-yellow-400 shadow-[0_0_10px_#facc15]" style="animation-delay: 0.2s;"></div>
+        <div class="light-bulb bg-emerald-400 shadow-[0_0_10px_#34d399]" style="animation-delay: 0.5s;"></div>
+        <div class="light-bulb bg-red-500 shadow-[0_0_10px_#ef4444] hidden sm:block" style="animation-delay: 0.8s;"></div>
+        <div class="light-bulb bg-yellow-400 shadow-[0_0_10px_#facc15] hidden sm:block" style="animation-delay: 1.1s;"></div>
+    </header>
+
+    <!-- Zone centrale flexible -->
+    <main class="relative z-10 flex-1 min-h-0 flex items-center justify-center px-3 sm:px-5 py-1.5 w-full max-w-2xl mx-auto">
+
+        <!-- 1. ÉCRAN DE BIENVENUE -->
+        <section id="welcome-screen" class="card w-full max-h-full rounded-3xl p-4 sm:p-6 text-center animate-pop border-t-4 sm:border-t-8 border-red-600 flex flex-col justify-center">
+            <div class="flex justify-center items-center gap-3 sm:gap-5 text-3xl sm:text-4xl mb-2">
+                <span class="animate-float" style="animation-delay: 0s;">🎄</span>
+                <span class="animate-float" style="animation-delay: 0.5s;">🎅</span>
+                <span class="animate-float" style="animation-delay: 1s;">⛄</span>
+                <span class="animate-float" style="animation-delay: 1.5s;">🎁</span>
+            </div>
+
+            <div>
+                <span class="inline-block bg-red-100 text-red-700 font-bold text-[11px] sm:text-xs uppercase tracking-wider px-3 py-0.5 rounded-full mb-1.5 border border-red-200">
+                    ✨ Mini Quiz de Noël ✨
+                </span>
+            </div>
+
+            <h1 class="title-clamp font-extrabold text-red-700 tracking-tight mb-2 drop-shadow-sm">
+                Calendrier de l'Avent
+            </h1>
+
+            <p class="text-sm sm:text-base text-gray-600 max-w-md mx-auto mb-4 leading-snug">
+                Ouvre les <strong class="text-emerald-700">6 cases magiques</strong> de Noël en répondant aux questions du Père Noël !
+            </p>
+
+            <!-- Aperçu des 6 cases de l'Avent -->
+            <div class="flex justify-center gap-2 sm:gap-2.5 mb-5" aria-hidden="true">
+                <div class="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-red-600 text-white font-festive font-bold text-base flex items-center justify-center shadow border-2 border-yellow-300">1</div>
+                <div class="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-emerald-700 text-white font-festive font-bold text-base flex items-center justify-center shadow border-2 border-yellow-300">2</div>
+                <div class="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-red-600 text-white font-festive font-bold text-base flex items-center justify-center shadow border-2 border-yellow-300">3</div>
+                <div class="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-emerald-700 text-white font-festive font-bold text-base flex items-center justify-center shadow border-2 border-yellow-300">4</div>
+                <div class="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-red-600 text-white font-festive font-bold text-base flex items-center justify-center shadow border-2 border-yellow-300">5</div>
+                <div class="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-amber-500 text-white font-festive font-bold text-base flex items-center justify-center shadow border-2 border-yellow-200">6</div>
+            </div>
+
+            <div>
+                <button id="start-btn" type="button" class="w-full sm:w-auto px-8 py-3 bg-gradient-to-r from-red-600 via-red-500 to-emerald-600 hover:from-red-700 hover:to-emerald-700 text-white font-festive font-bold text-lg sm:text-xl rounded-2xl shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 active:translate-y-0 transition-all duration-200 cursor-pointer inline-flex items-center justify-center gap-2 border-2 border-yellow-300/80">
+                    <span>Commencer</span>
+                    <span class="text-xl">🎄</span>
+                </button>
+            </div>
+        </section>
+
+        <!-- 2. ÉCRAN DU QUIZ (6 QUESTIONS) -->
+        <section id="quiz-screen" class="hidden card w-full max-h-full rounded-3xl p-3 sm:p-5 border-t-4 sm:border-t-8 border-emerald-600 flex flex-col justify-between gap-2">
+            <!-- En-tête compact du quiz -->
+            <div class="shrink-0">
+                <div class="flex items-center justify-between gap-2 mb-1.5">
+                    <div class="flex items-center gap-1.5">
+                        <span id="question-counter" class="bg-emerald-100 text-emerald-800 font-bold text-xs px-2.5 py-0.5 rounded-full border border-emerald-200">
+                            Question 1 / 6
+                        </span>
+                        <span id="score-badge" class="bg-amber-100 text-amber-800 font-bold text-xs px-2.5 py-0.5 rounded-full border border-amber-200">
+                            ⭐ 0 / 6
+                        </span>
+                    </div>
+                    <!-- 6 indicateurs de cases -->
+                    <div class="flex items-center gap-1" id="doors-progress" aria-label="Progression des 6 cases"></div>
+                </div>
+
+                <!-- Barre de progression -->
+                <div class="w-full bg-gray-200 h-1.5 rounded-full overflow-hidden">
+                    <div id="progress-bar" class="bg-gradient-to-r from-red-500 via-amber-400 to-emerald-500 h-full rounded-full transition-all duration-500" style="width: 16.6%;"></div>
+                </div>
+            </div>
+
+            <!-- Question et Emoji -->
+            <div class="shrink-0 text-center py-0.5">
+                <div class="inline-flex items-center justify-center mb-1">
+                    <span id="question-emoji" class="inline-block text-2xl sm:text-3xl p-1.5 bg-amber-50 rounded-xl border border-amber-200 shadow-inner">
+                        🦌
+                    </span>
+                </div>
+                <h2 id="question-text" class="question-clamp font-bold text-gray-800 text-center px-1">
+                    Chargement de la question...
+                </h2>
+            </div>
+
+            <!-- Choix de réponses (3 boutons par question) -->
+            <div id="answers-grid" class="shrink-0 grid grid-cols-1 gap-2">
+                <!-- Boutons générés dynamiquement -->
+            </div>
+
+            <!-- ZONE DE RETOUR : BONNE RÉPONSE (BRAVO + PERSONNAGES + BOUTON SUIVANT) -->
+            <div id="feedback-correct" class="hidden shrink-0 rounded-2xl bg-gradient-to-br from-emerald-50 to-green-100 border-2 border-emerald-500 p-2.5 sm:p-3 animate-pop relative z-20">
+                <div class="flex flex-col sm:flex-row items-center justify-between gap-2">
+                    <div class="flex items-center gap-2.5 text-center sm:text-left">
+                        <div class="text-2xl sm:text-3xl flex gap-1 shrink-0" aria-hidden="true">
+                            <span class="animate-dance">🎅</span>
+                            <span class="animate-dance-delay-1">🦌</span>
+                            <span class="animate-dance-delay-2">⛄</span>
+                        </div>
+                        <div>
+                            <h3 class="font-festive text-lg sm:text-xl font-extrabold text-emerald-700 leading-tight">
+                                Bravo ! 🎉
+                            </h3>
+                            <p id="correct-fact" class="text-emerald-900 font-medium text-xs leading-snug">
+                                Super ! Tu as trouvé la bonne réponse !
+                            </p>
+                        </div>
+                    </div>
+                    <button id="next-btn" type="button" class="w-full sm:w-auto shrink-0 px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white font-festive font-bold text-sm sm:text-base rounded-xl shadow-md hover:shadow-lg transition-all cursor-pointer inline-flex items-center justify-center gap-1.5 border border-emerald-400">
+                        <span id="next-btn-text">Question suivante ➡️</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- ZONE DE RETOUR : MAUVAISE RÉPONSE (OUPS + BOUTON RÉESSAYER) -->
+            <div id="feedback-wrong" class="hidden shrink-0 rounded-2xl bg-gradient-to-br from-amber-50 to-orange-100 border-2 border-orange-400 p-2.5 sm:p-3 animate-shake relative z-20">
+                <div class="flex flex-col sm:flex-row items-center justify-between gap-2">
+                    <div class="flex items-center gap-2 text-center sm:text-left">
+                        <span class="text-2xl shrink-0">❄️🤔</span>
+                        <p class="font-festive font-bold text-orange-900 text-sm sm:text-base leading-tight">
+                            Oups ! Ce n'est pas la bonne réponse.
+                        </p>
+                    </div>
+                    <button id="retry-btn" type="button" class="w-full sm:w-auto shrink-0 px-5 py-2.5 bg-orange-500 hover:bg-orange-600 active:bg-orange-700 text-white font-festive font-bold text-sm sm:text-base rounded-xl shadow-md hover:shadow-lg transition-all cursor-pointer inline-flex items-center justify-center gap-1.5 border border-orange-300">
+                        <span>🔄 Réessayer</span>
+                    </button>
+                </div>
+            </div>
+        </section>
+
+        <!-- 3. ÉCRAN FINAL : JOYEUX NOËL ! -->
+        <section id="end-screen" class="hidden card w-full max-h-full rounded-3xl p-4 sm:p-6 text-center animate-pop border-t-4 sm:border-t-8 border-amber-400 flex flex-col justify-center">
+            <div class="text-3xl sm:text-4xl mb-2 flex justify-center gap-3">
+                <span class="animate-dance">🎅</span>
+                <span class="animate-dance-delay-1">⛄</span>
+                <span class="animate-dance-delay-2">🦌</span>
+                <span class="animate-dance">🎄</span>
+            </div>
+
+            <div>
+                <span class="inline-block bg-amber-100 text-amber-800 font-bold text-[11px] sm:text-xs uppercase tracking-wider px-3 py-0.5 rounded-full mb-1.5 border border-amber-300">
+                    🏆 Calendrier complété 🏆
+                </span>
+            </div>
+
+            <h2 class="title-clamp font-extrabold text-red-700 mb-2">
+                Joyeux Noël !
+            </h2>
+
+            <p class="text-sm sm:text-base text-gray-700 max-w-md mx-auto mb-3 leading-snug">
+                Bravo ! Tu as ouvert toutes les cases du <strong class="text-emerald-700">Calendrier de l'Avent</strong> ! 🎁✨
+            </p>
+
+            <!-- Les 6 étoiles -->
+            <div class="bg-amber-50 border-2 border-amber-200 rounded-2xl p-3 mb-4 max-w-xs mx-auto w-full">
+                <div class="text-xl sm:text-2xl tracking-widest mb-0.5">⭐⭐⭐⭐⭐⭐</div>
+                <p id="final-score-text" class="text-xs sm:text-sm font-bold text-amber-900">6 / 6 étoiles gagnées !</p>
+            </div>
+
+            <div>
+                <button id="restart-btn" type="button" class="w-full sm:w-auto px-7 py-3 bg-gradient-to-r from-emerald-600 to-red-600 hover:from-emerald-700 hover:to-red-700 text-white font-festive font-bold text-base sm:text-lg rounded-2xl shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 transition-all cursor-pointer inline-flex items-center justify-center gap-2 border-2 border-yellow-300">
+                    <span>🔄 Rejouer le quiz</span>
+                </button>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- PIED DE PAGE FIXE "FAIT PAR JACOB" -->
+    <footer class="relative z-10 w-full shrink-0 py-1.5 px-4 text-center bg-black/35 backdrop-blur-sm border-t border-white/10">
+        <p class="text-white/95 font-festive text-sm sm:text-base tracking-wide flex items-center justify-center gap-2">
+            <span>❄️</span>
+            <span>Fait par Jacob</span>
+            <span>🎄</span>
+        </p>
+    </footer>
+
+    <!-- LOGIQUE JAVASCRIPT -->
+    <script>
+        // ==========================================
+        // 1. LES 6 QUESTIONS EXACTES DU QUIZ
+        // ==========================================
+        const quizQuestions = [
+            {
+                emoji: "🦌",
+                question: "Quel est le prénom du célèbre renne au nez rouge du Père Noël ?",
+                options: [
+                    { text: "Rodolphe", correct: true },
+                    { text: "Tornade", correct: false },
+                    { text: "Comète", correct: false }
+                ],
+                fact: "Son nez rouge lumineux guide le traîneau du Père Noël !"
+            },
+            {
+                emoji: "⛄",
+                question: "Quel bonhomme de neige prend vie grâce à un chapeau magique dans la chanson ?",
+                options: [
+                    { text: "Frosty", correct: true },
+                    { text: "Olaf", correct: false },
+                    { text: "Boule de Neige", correct: false }
+                ],
+                fact: "Dès qu'on lui pose ce vieux chapeau haut-de-forme, Frosty se met à danser !"
+            },
+            {
+                emoji: "💚",
+                question: "Comment s'appelle le personnage vert qui déteste Noël et tente de le voler ?",
+                options: [
+                    { text: "Le Grinch", correct: true },
+                    { text: "Scrooge", correct: false },
+                    { text: "Jack Skellington", correct: false }
+                ],
+                fact: "Heureusement, son cœur finit par grandir de trois tailles le jour de Noël !"
+            },
+            {
+                emoji: "🎄",
+                question: "Quelle décoration brillante place-t-on tout en haut du sapin de Noël ?",
+                options: [
+                    { text: "Une étoile", correct: true },
+                    { text: "Une chaussette", correct: false },
+                    { text: "Une cloche", correct: false }
+                ],
+                fact: "L'étoile tout en haut fait briller le sapin de mille feux !"
+            },
+            {
+                emoji: "🍪",
+                question: "Que laisse-t-on traditionnellement au Père Noël la veille de Noël ?",
+                options: [
+                    { text: "Des biscuits et du lait", correct: true },
+                    { text: "Une pizza et du jus", correct: false },
+                    { text: "Des bonbons et de l'eau", correct: false }
+                ],
+                fact: "Un délicieux goûter pour lui donner de l'énergie pendant sa tournée !"
+            },
+            {
+                emoji: "🎶",
+                question: "Quel pays est nommé dès le début de la chanson « Le petit renne au nez rouge » ?",
+                options: [
+                    { text: "La Finlande", correct: true },
+                    { text: "Le Canada", correct: false },
+                    { text: "La Suède", correct: false }
+                ],
+                fact: "La chanson débute par « Quand, dans le ciel de Finlande... » !"
+            }
+        ];
+
+        // ==========================================
+        // 2. ÉTAT & RÉFÉRENCES DOM
+        // ==========================================
+        let currentQuestionIndex = 0;
+        let solvedQuestions = new Array(quizQuestions.length).fill(false);
+
+        const welcomeScreen = document.getElementById('welcome-screen');
+        const quizScreen = document.getElementById('quiz-screen');
+        const endScreen = document.getElementById('end-screen');
+
+        const startBtn = document.getElementById('start-btn');
+        const nextBtn = document.getElementById('next-btn');
+        const nextBtnText = document.getElementById('next-btn-text');
+        const retryBtn = document.getElementById('retry-btn');
+        const restartBtn = document.getElementById('restart-btn');
+
+        const questionCounter = document.getElementById('question-counter');
+        const scoreBadge = document.getElementById('score-badge');
+        const doorsProgress = document.getElementById('doors-progress');
+        const progressBar = document.getElementById('progress-bar');
+        const questionEmoji = document.getElementById('question-emoji');
+        const questionText = document.getElementById('question-text');
+        const answersGrid = document.getElementById('answers-grid');
+
+        const feedbackCorrect = document.getElementById('feedback-correct');
+        const correctFact = document.getElementById('correct-fact');
+        const feedbackWrong = document.getElementById('feedback-wrong');
+        const finalScoreText = document.getElementById('final-score-text');
+
+        // ==========================================
+        // 3. LOGIQUE DU QUIZ
+        // ==========================================
+        function startQuiz() {
+            currentQuestionIndex = 0;
+            solvedQuestions = new Array(quizQuestions.length).fill(false);
+            welcomeScreen.classList.add('hidden');
+            endScreen.classList.add('hidden');
+            quizScreen.classList.remove('hidden');
+            renderQuestion();
+        }
+
+        function getScore() {
+            return solvedQuestions.filter(Boolean).length;
+        }
+
+        function renderDoorsProgress() {
+            doorsProgress.innerHTML = '';
+            quizQuestions.forEach((_, idx) => {
+                const door = document.createElement('span');
+                const isSolved = solvedQuestions[idx];
+                const isCurrent = idx === currentQuestionIndex;
+
+                door.textContent = isSolved ? '★' : (idx + 1);
+                door.className = `w-6 h-6 rounded-lg font-festive font-bold text-xs flex items-center justify-center transition-all ${
+                    isSolved
+                        ? 'bg-amber-400 text-amber-950 shadow-sm scale-105'
+                        : isCurrent
+                            ? 'bg-red-600 text-white ring-2 ring-red-300'
+                            : 'bg-gray-200 text-gray-500'
+                }`;
+                doorsProgress.appendChild(door);
+            });
+            scoreBadge.textContent = `⭐ ${getScore()} / ${quizQuestions.length}`;
+        }
+
+        function renderQuestion() {
+            const currentQ = quizQuestions[currentQuestionIndex];
+            const total = quizQuestions.length;
+
+            // Remettre le scroll interne de la carte en haut
+            quizScreen.scrollTop = 0;
+
+            questionCounter.textContent = `Question ${currentQuestionIndex + 1} / ${total}`;
+            progressBar.style.width = `${((currentQuestionIndex + 1) / total) * 100}%`;
+            renderDoorsProgress();
+
+            questionEmoji.textContent = currentQ.emoji;
+            questionText.textContent = currentQ.question;
+
+            // Masquer les zones de feedback
+            feedbackCorrect.classList.add('hidden');
+            feedbackWrong.classList.add('hidden');
+
+            // Mélanger légèrement ou garder l'ordre clair des 3 options
+            answersGrid.innerHTML = '';
+            const letters = ['A', 'B', 'C'];
+
+            currentQ.options.forEach((option, index) => {
+                const btn = document.createElement('button');
+                btn.type = 'button';
+                btn.className = 'answer-btn option-clamp w-full text-left px-3.5 py-2 sm:py-2.5 rounded-xl border-2 border-gray-200 bg-white hover:bg-amber-50 hover:border-amber-400 font-semibold text-gray-800 shadow-sm transition-all duration-150 flex items-center gap-2.5 cursor-pointer active:scale-[0.98]';
+                
+                btn.innerHTML = `
+                    <span class="w-6 h-6 sm:w-7 sm:h-7 rounded-lg bg-red-100 text-red-700 font-festive font-bold text-xs sm:text-sm flex items-center justify-center shrink-0">
+                        ${letters[index]}
+                    </span>
+                    <span class="leading-tight">${option.text}</span>
+                `;
+
+                btn.addEventListener('click', () => handleAnswerClick(btn, option.correct));
+                answersGrid.appendChild(btn);
+            });
+        }
+
+        function handleAnswerClick(selectedBtn, isCorrect) {
+            const allBtns = answersGrid.querySelectorAll('button');
+            allBtns.forEach(btn => {
+                btn.disabled = true;
+                btn.classList.remove('hover:bg-amber-50', 'hover:border-amber-400', 'cursor-pointer');
+                btn.classList.add('cursor-default');
+            });
+
+            if (isCorrect) {
+                solvedQuestions[currentQuestionIndex] = true;
+                renderDoorsProgress();
+
+                selectedBtn.classList.remove('border-gray-200', 'bg-white');
+                selectedBtn.classList.add('border-emerald-500', 'bg-emerald-100', 'text-emerald-950', 'ring-2', 'ring-emerald-300');
+
+                const currentQ = quizQuestions[currentQuestionIndex];
+                correctFact.textContent = currentQ.fact;
+                nextBtnText.textContent = currentQuestionIndex === quizQuestions.length - 1
+                    ? 'Voir le résultat 🏆'
+                    : 'Question suivante ➡️';
+
+                feedbackWrong.classList.add('hidden');
+                feedbackCorrect.classList.remove('hidden');
+
+                // S'assurer que le bouton suivant est visible même sur un tout petit écran
+                requestAnimationFrame(() => {
+                    feedbackCorrect.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                });
+
+                launchConfetti(110);
+            } else {
+                selectedBtn.classList.remove('border-gray-200', 'bg-white');
+                selectedBtn.classList.add('border-red-500', 'bg-red-100', 'text-red-950');
+
+                feedbackCorrect.classList.add('hidden');
+                feedbackWrong.classList.remove('hidden');
+                feedbackWrong.classList.remove('animate-shake');
+                void feedbackWrong.offsetWidth;
+                feedbackWrong.classList.add('animate-shake');
+
+                requestAnimationFrame(() => {
+                    feedbackWrong.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                });
+            }
+        }
+
+        // Réessayer uniquement la question en cours
+        retryBtn.addEventListener('click', () => {
+            feedbackWrong.classList.add('hidden');
+            const allBtns = answersGrid.querySelectorAll('button');
+            allBtns.forEach(btn => {
+                btn.disabled = false;
+                btn.className = 'answer-btn option-clamp w-full text-left px-3.5 py-2 sm:py-2.5 rounded-xl border-2 border-gray-200 bg-white hover:bg-amber-50 hover:border-amber-400 font-semibold text-gray-800 shadow-sm transition-all duration-150 flex items-center gap-2.5 cursor-pointer active:scale-[0.98]';
+            });
+        });
+
+        // Passer immédiatement à la question suivante ou à l'écran final
+        nextBtn.addEventListener('click', () => {
+            if (currentQuestionIndex < quizQuestions.length - 1) {
+                currentQuestionIndex++;
+                renderQuestion();
+            } else {
+                quizScreen.classList.add('hidden');
+                endScreen.classList.remove('hidden');
+                finalScoreText.textContent = `${getScore()} / ${quizQuestions.length} étoiles gagnées !`;
+                launchConfetti(160);
+            }
+        });
+
+        startBtn.addEventListener('click', startQuiz);
+        restartBtn.addEventListener('click', startQuiz);
+
+        // ==========================================
+        // 4. ANIMATION DES FLOCONS DE NEIGE
+        // ==========================================
+        const snowCanvas = document.getElementById('snow-canvas');
+        const snowCtx = snowCanvas.getContext('2d');
+        const confettiCanvas = document.getElementById('confetti-canvas');
+        const confettiCtx = confettiCanvas.getContext('2d');
+        let snowflakes = [];
+
+        function resizeCanvases() {
+            snowCanvas.width = window.innerWidth;
+            snowCanvas.height = window.innerHeight;
+            confettiCanvas.width = window.innerWidth;
+            confettiCanvas.height = window.innerHeight;
+        }
+
+        function initSnow() {
+            snowflakes = [];
+            const count = Math.min(70, Math.floor(window.innerWidth / 15));
+            for (let i = 0; i < count; i++) {
+                snowflakes.push({
+                    x: Math.random() * snowCanvas.width,
+                    y: Math.random() * snowCanvas.height,
+                    r: Math.random() * 3 + 1.5,
+                    speedY: Math.random() * 1 + 0.4,
+                    speedX: Math.random() * 0.6 - 0.3,
+                    opacity: Math.random() * 0.6 + 0.3
+                });
+            }
+        }
+
+        function updateSnow() {
+            snowCtx.clearRect(0, 0, snowCanvas.width, snowCanvas.height);
+            snowflakes.forEach(flake => {
+                snowCtx.beginPath();
+                snowCtx.arc(flake.x, flake.y, flake.r, 0, Math.PI * 2);
+                snowCtx.fillStyle = `rgba(255, 255, 255, ${flake.opacity})`;
+                snowCtx.fill();
+
+                flake.y += flake.speedY;
+                flake.x += flake.speedX;
+
+                if (flake.y > snowCanvas.height) {
+                    flake.y = -5;
+                    flake.x = Math.random() * snowCanvas.width;
+                }
+                if (flake.x > snowCanvas.width) flake.x = 0;
+                if (flake.x < 0) flake.x = snowCanvas.width;
+            });
+            requestAnimationFrame(updateSnow);
+        }
+
+        // ==========================================
+        // 5. ANIMATION DES CONFETTIS DE NOËL
+        // ==========================================
+        let confettiPieces = [];
+        let confettiAnimating = false;
+        const festiveColors = ['#ef4444', '#10b981', '#facc15', '#3b82f6', '#ffffff', '#f97316'];
+
+        function launchConfetti(amount = 100) {
+            for (let i = 0; i < amount; i++) {
+                confettiPieces.push({
+                    x: confettiCanvas.width * (0.2 + Math.random() * 0.6),
+                    y: confettiCanvas.height * 0.55,
+                    w: Math.random() * 9 + 5,
+                    h: Math.random() * 5 + 4,
+                    color: festiveColors[Math.floor(Math.random() * festiveColors.length)],
+                    vx: (Math.random() - 0.5) * 14,
+                    vy: -(Math.random() * 11 + 5),
+                    gravity: 0.32,
+                    rotation: Math.random() * 360,
+                    rotationSpeed: (Math.random() - 0.5) * 12
+                });
+            }
+            if (!confettiAnimating) {
+                confettiAnimating = true;
+                animateConfetti();
+            }
+        }
+
+        function animateConfetti() {
+            confettiCtx.clearRect(0, 0, confettiCanvas.width, confettiCanvas.height);
+
+            confettiPieces.forEach((p, index) => {
+                p.x += p.vx;
+                p.y += p.vy;
+                p.vy += p.gravity;
+                p.rotation += p.rotationSpeed;
+
+                confettiCtx.save();
+                confettiCtx.translate(p.x, p.y);
+                confettiCtx.rotate((p.rotation * Math.PI) / 180);
+                confettiCtx.fillStyle = p.color;
+                confettiCtx.fillRect(-p.w / 2, -p.h / 2, p.w, p.h);
+                confettiCtx.restore();
+
+                if (p.y > confettiCanvas.height + 20) {
+                    confettiPieces.splice(index, 1);
+                }
+            });
+
+            if (confettiPieces.length > 0) {
+                requestAnimationFrame(animateConfetti);
+            } else {
+                confettiAnimating = false;
+            }
+        }
+
+        window.addEventListener('resize', () => {
+            resizeCanvases();
+            initSnow();
+        });
+
+        window.onload = function () {
+            resizeCanvases();
+            initSnow();
+            updateSnow();
+        };
+    </script>
+</body>
+</html>
